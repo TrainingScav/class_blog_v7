@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @Slf4j
-@RestController
+@RestController // @Controller, @ResponseBody
 public class UserRestController {
 
     // @Slf4j 사용 시 자동 선언 됨
