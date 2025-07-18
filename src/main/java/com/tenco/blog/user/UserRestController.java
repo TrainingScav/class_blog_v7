@@ -1,96 +1,75 @@
 package com.tenco.blog.user;
 
 import com.tenco.blog._core.common.ApiUtil;
-import com.tenco.blog.utils.Define;
-import jakarta.servlet.http.HttpSession;
+import com.tenco.blog._core.errors.exception.Exception401;
+import com.tenco.blog._core.utils.Define;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
-@Slf4j
 @RestController // @Controller, @ResponseBody
 public class UserRestController {
 
-    // @Slf4j 사용 시 자동 선언 됨
-    //private static final Logger log = LoggerFactory.getLogger(UserRestController.class);
-
-    // 생성자 의존 주입 - DI
-    @Autowired
     private final UserService userService;
 
-
-    // http://localhost:8080/join
-    // 회원가입 요청
+    // 회원가입 API (인증 불필요)
     @PostMapping("/join")
-    //public ResponseEntity<ApiUtil<UserResponse.JoinDTO>> join() {
-    // JSON 형식의 데이터를 추출 할 때 선언
-    public ResponseEntity<?> join(@RequestBody UserRequest.JoinDTO reqDTO) {
-        log.info("회원가입 API 호출 - 사용자명 : {}, 이메일 : {}", reqDTO.getUsername(), reqDTO.getEmail());
+    public ResponseEntity<?> join(@Valid @RequestBody UserRequest.JoinDTO joinDTO,
+                                  Errors errors) {
 
-        reqDTO.validate();
-
-        // 서비스에 위임 처리
-        UserResponse.JoinDTO joinUser = userService.join(reqDTO);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiUtil<>(joinUser));
+        UserResponse.JoinDTO joinedUser = userService.join(joinDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiUtil<>(joinedUser));
     }
 
-
-    // 로그인 요청 API
-    // http://localhost:8080/login
+    // 로그인 API (인증 불필요)
     @PostMapping("/login")
-    public ResponseEntity<ApiUtil<UserResponse.LoginDTO>> login(@RequestBody UserRequest.LoginDTO reqDTO, HttpSession session) {
-        log.info("로그인 API 호출 - 사용자명: {}", reqDTO.getUsername());
-        reqDTO.validate();
+    public ResponseEntity<?> login(@Valid @RequestBody UserRequest.LoginDTO loginDTO) {
 
-        UserResponse.LoginDTO loginUser = userService.login(reqDTO);
+        String jwtToken = userService.login(loginDTO);
 
-        // 세션에 정보 저장
-        session.setAttribute(Define.SESSION_USER, loginUser);
-
-        return ResponseEntity.ok(new ApiUtil<>(loginUser));
+        return ResponseEntity.ok()
+                .header("Authorization", "Bearer " + jwtToken)
+                .body(new ApiUtil<>(null));
     }
 
-    // 회원 정보 조회
+    // 회원정보 조회 API (JWT 인증 필요)
     @GetMapping("/api/users/{id}")
-    public ResponseEntity<ApiUtil<UserResponse.DetailDTO>> getUserInfo(@PathVariable(name = "id") Long id, HttpSession session) {
-        log.info("회원 정보 조회 API 호출 - ID: {}", id);
+    public ResponseEntity<?> getUserInfo(@PathVariable(name = "id") Long id,
+                                         @RequestAttribute(Define.SESSION_USER) SessionUser sessionUser) {
 
-        User sessionUser = (User)session.getAttribute(Define.SESSION_USER);
+        // 인증 체크
+        if (sessionUser == null) {
+            throw new Exception401("인증 정보가 없습니다");
+        }
 
-        // 로그인한 사용자가 - 10
-        // 로그인한 사용자가 - 30 (정보요청)
-        UserResponse.DetailDTO userDetail = userService.findUserById(id, sessionUser);
+        UserResponse.DetailDTO userDetail = userService.findUserById(id, sessionUser.getId());
 
         return ResponseEntity.ok(new ApiUtil<>(userDetail));
     }
 
-    // 회원 정보 수정
+    // 회원정보 수정 API (JWT 인증 필요)
     @PutMapping("/api/users/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable(name = "id") Long id, @RequestBody UserRequest.UpdateDTO updateDTO) {
+    public ResponseEntity<?> updateUser(@PathVariable(name = "id") Long id,
+                                        @RequestAttribute(Define.SESSION_USER) SessionUser sessionUser,
+                                        @Valid @RequestBody UserRequest.UpdateDTO updateDTO,
+                                        Errors errors) {
 
-        // 인증검사는 인터셉터에서 처리 됨
-        // 유효성 검사
-        updateDTO.validate();
-        UserResponse.UpdateDTO updateUser = userService.updateById(id, updateDTO);
+        // 인증 체크
+        if (sessionUser == null) {
+            throw new Exception401("인증 정보가 없습니다");
+        }
+        UserResponse.UpdateDTO updateUser = userService.updateById(id, sessionUser.getId(), updateDTO);
 
         return ResponseEntity.ok(new ApiUtil<>(updateUser));
-
     }
 
-    // 로그아웃 처리
-    @GetMapping("/logout")
-    public ResponseEntity<ApiUtil<String>> logout(HttpSession session) {
-        log.info("로그아웃 API 호출");
-        session.invalidate();
-
+    // 클라이언트 단에서 jwt 토큰 정보를 직접 삭제 처리 한다.
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
         return ResponseEntity.ok(new ApiUtil<>("로그아웃 성공"));
-
     }
 }

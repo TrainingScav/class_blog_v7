@@ -2,14 +2,13 @@ package com.tenco.blog.board;
 
 import com.tenco.blog.reply.Reply;
 import com.tenco.blog.user.User;
-import com.tenco.blog.utils.MyDateUtil;
+import com.tenco.blog._core.utils.MyDateUtil;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -76,14 +75,12 @@ public class Board {
 
     // 수정 기능 추가
     public void update(BoardRequest.UpdateDTO updateDTO) {
-        // 사용자가 던진 값이 유효한지 확인 절차
-        updateDTO.validate();
-
         this.title = updateDTO.getTitle();
         this.content = updateDTO.getContent();
-        // 필드 값 변경 감지 해서 더티 체킹
-        // 트랜잭션이 끝나는 시점에 자동으로 업데이트 쿼리를 생성해서
-        // 물리적인 저장 장치인 데이터베이스에 Commit
+    }
+
+    public String getWriterName() {
+        return this.username;
     }
 
 
